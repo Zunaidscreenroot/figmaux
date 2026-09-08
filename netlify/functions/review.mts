@@ -1,18 +1,15 @@
-import type { Config, Context } from "@netlify/functions";
-
-const MODEL = Netlify.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_INLINE_BASE64_CHARS = 5_500_000;
 const ALLOWED_FIGMA_HOSTS = ["figma.com", "www.figma.com", "figmausercontent.com", "www.figmausercontent.com"];
 
-function json(data: unknown, status = 200) {
+function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
 }
 
-function isAllowedImageUrl(value: string) {
+function isAllowedImageUrl(value) {
   try {
     const url = new URL(value);
     return url.protocol === "https:" && ALLOWED_FIGMA_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
@@ -21,18 +18,18 @@ function isAllowedImageUrl(value: string) {
   }
 }
 
-function extractOutput(body: any): string {
+function extractOutput(body) {
   if (typeof body?.output_text === "string") return body.output_text;
   const steps = Array.isArray(body?.steps) ? body.steps : [];
-  const modelStep = [...steps].reverse().find((step: any) => step?.type === "model_output");
+  const modelStep = [...steps].reverse().find((step) => step?.type === "model_output");
   const content = modelStep?.content;
   if (Array.isArray(content)) {
-    return content.filter((item: any) => item?.type === "text").map((item: any) => item.text).join("\n").trim();
+    return content.filter((item) => item?.type === "text").map((item) => item.text).join("\n").trim();
   }
   return "";
 }
 
-function buildPrompt(context: string, focus: string) {
+function buildPrompt(context, focus) {
   return `You are an independent senior product designer and UX reviewer. Review the supplied mobile UI screenshot as evidence, not as a generic design exercise.
 
 Review context:
@@ -90,7 +87,7 @@ DO NOT CHANGE
 Be concrete enough that another designer can implement the fixes directly in Figma.`;
 }
 
-async function imageFromUrl(url: string) {
+async function imageFromUrl(url) {
   if (!isAllowedImageUrl(url)) throw new Error("Only HTTPS Figma screenshot URLs are accepted.");
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) throw new Error(`Could not fetch the Figma screenshot (${response.status}).`);
@@ -106,15 +103,16 @@ async function imageFromUrl(url: string) {
   return { data: btoa(binary), mime_type: mime };
 }
 
-async function callGemini(image: { data: string; mime_type: string }, prompt: string) {
+async function callGemini(image, prompt) {
   const key = Netlify.env.get("GEMINI_API_KEY");
+  const model = Netlify.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
   if (!key) throw new Error("GEMINI_API_KEY is not configured on Netlify.");
 
   const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       input: [
         { type: "image", data: image.data, mime_type: image.mime_type, resolution: "high" },
         { type: "text", text: prompt },
@@ -128,10 +126,10 @@ async function callGemini(image: { data: string; mime_type: string }, prompt: st
   }
   const analysis = extractOutput(body);
   if (!analysis) throw new Error("Gemini returned no text analysis.");
-  return analysis;
+  return { analysis, model };
 }
 
-export default async (req: Request, _context: Context) => {
+export default async (req) => {
   if (req.method === "GET") {
     const url = new URL(req.url);
     const imageUrl = url.searchParams.get("image_url");
@@ -140,8 +138,8 @@ export default async (req: Request, _context: Context) => {
     if (!imageUrl) return json({ error: "Missing image_url. Pass a Figma screenshot URL." }, 400);
     try {
       const image = await imageFromUrl(imageUrl);
-      const analysis = await callGemini(image, buildPrompt(context, focus));
-      return json({ ok: true, model: MODEL, analysis });
+      const result = await callGemini(image, buildPrompt(context, focus));
+      return json({ ok: true, ...result });
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : "Unknown reviewer error." }, 500);
     }
@@ -151,7 +149,7 @@ export default async (req: Request, _context: Context) => {
 
   try {
     const body = await req.json();
-    let image: { data: string; mime_type: string };
+    let image;
     if (typeof body.image_data === "string" && body.image_data.length) {
       if (body.image_data.length > MAX_INLINE_BASE64_CHARS) throw new Error("Screenshot is too large for a browser upload. Use the Figma screenshot URL field instead.");
       image = { data: body.image_data, mime_type: body.mime_type || "image/png" };
@@ -160,14 +158,14 @@ export default async (req: Request, _context: Context) => {
     } else {
       return json({ error: "Provide image_data or image_url." }, 400);
     }
-    const analysis = await callGemini(image, buildPrompt(body.context || "", body.focus || "full"));
-    return json({ ok: true, model: MODEL, analysis });
+    const result = await callGemini(image, buildPrompt(body.context || "", body.focus || "full"));
+    return json({ ok: true, ...result });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Unknown reviewer error." }, 500);
   }
 };
 
-export const config: Config = {
+export const config = {
   path: "/api/review",
   method: ["GET", "POST"],
   rateLimit: { action: "rate_limit", aggregateBy: ["ip"], windowSize: 60, windowLimit: 10 },
