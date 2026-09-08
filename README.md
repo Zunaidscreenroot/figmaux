@@ -1,28 +1,78 @@
 # Gemini Visual Reviewer
 
-A small Netlify-hosted visual UX reviewer powered by the Gemini API.
+Backend-only visual UX review service for the Screenroot design workflow.
 
-## What it does
+## Purpose
 
-- Accepts a screenshot upload or a Figma MCP screenshot URL.
-- Sends the image server-side to Gemini 3.8 Flash with high-resolution visual input.
-- Returns an independent UX, visual hierarchy, mobile usability and business/funnel critique.
-- Keeps the Gemini API key server-side in Netlify environment variables.
-- Exposes `GET /api/review?image_url=...` so ChatGPT can request a review of a Figma screenshot and receive JSON analysis in-chat.
+This service is an independent visual-review layer. It receives a Figma screenshot plus product/task context, sends the image to Gemini 3.8 Flash, and returns structured UX, visual and business/funnel findings.
 
-## ChatGPT workflow
+It has **no browser reviewer UI and no Figma write access**.
 
-1. ChatGPT reads a target frame in the allowed Figma workspace.
-2. ChatGPT requests a screenshot through Figma MCP.
-3. ChatGPT calls the deployed `/api/review` endpoint with the Figma screenshot URL and product context.
-4. Gemini returns an independent critique.
-5. ChatGPT presents the critique and decides what, if anything, should be changed in Figma.
+## API
 
-Gemini is a read-only reviewer. It does not receive Figma write tools or modify designs.
+### `GET /api/review`
+
+Designed for ChatGPT-driven reviews where the screenshot already exists as a Figma-hosted URL.
+
+Required:
+- `image_url` — HTTPS Figma screenshot URL
+
+Optional:
+- `screen` — screen name, e.g. `NTB` or `Rejected`
+- `task` — change being reviewed
+- `context` — product/business context and constraints
+- `focus` — `full`, `hierarchy`, `mobile`, `conversion`, or `visual`
+- `mode` — `post_change`, `pre_change`, or `comparison`
+
+The response is JSON containing the review plus the supplied metadata and model name.
+
+### `POST /api/review`
+
+Accepts JSON with either:
+- `image_url` (preferred for Figma screenshots), or
+- `image_data` + optional `mime_type`
+
+It accepts the same `screen`, `task`, `context`, `focus`, and `mode` fields as GET.
+
+## Review output
+
+The structured review contains:
+- `score` — 0–100
+- `verdict`
+- `critical_issues`
+- `ux_issues`
+- `visual_issues`
+- `business_opportunities`
+- `recommended_fixes`
+- `high_fidelity_polish`
+- `do_not_change`
+- `assumptions`
+
+Issues include severity, visible evidence and impact. Recommended fixes include priority, before/after direction and rationale.
+
+## Intended ChatGPT loop
+
+1. Inspect the allowed Figma screen.
+2. Form the UX/product hypothesis.
+3. Make the requested Figma change.
+4. Take a fresh Figma screenshot.
+5. Call `/api/review` with screenshot + task/context.
+6. Compare Gemini's independent findings with the designer analysis.
+7. Fix missed high-impact issues in Figma when appropriate.
+8. Re-screenshot and optionally re-review.
+
+Gemini is a critic, not the source of truth: product requirements and the approved design intent remain authoritative.
+
+## Security / limits
+
+- `GEMINI_API_KEY` stays server-side in Netlify environment variables.
+- URL-based images are restricted to HTTPS Figma hosts.
+- Remote screenshots are limited to 15 MB.
+- Inline base64 images are limited to keep requests within Netlify's function payload constraints.
+- Netlify rate limiting is configured at 10 requests per IP per 60 seconds.
+- The endpoint does not expose or accept Figma write operations.
 
 ## Environment variables
 
-- `GEMINI_API_KEY` — required, secret.
+- `GEMINI_API_KEY` — required secret.
 - `GEMINI_MODEL` — optional; defaults to `gemini-3.8-flash`.
-
-The API endpoint only accepts HTTPS Figma-hosted screenshot URLs for URL-based reviews.
