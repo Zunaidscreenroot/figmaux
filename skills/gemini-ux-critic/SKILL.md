@@ -1,25 +1,46 @@
 # Gemini UX Critic
 
-Use Gemini as an optional independent UX critic to add a second model perspective to UX analysis.
+Use the Gemini API as an independent UX critic that gives the primary Codex agent a second model perspective.
 
 ## Role
 
 Gemini is a critic, not the source of truth and not the design executor.
 
-The primary agent remains responsible for:
+The primary Codex agent remains responsible for:
 - Scope and workspace safety
-- Figma inspection
+- Figma inspection through Figma MCP
 - Requirements and business context
 - Final UX reasoning
 - Recommendations
+- Approval handling
 - Figma implementation
 - Re-audit
 
 Gemini provides an independent critique that can expose blind spots, alternative interpretations, usability risks, and additional opportunities.
 
+## Architecture
+
+This is a **double-engine agent**:
+
+`User → Codex/ChatGPT reasoning → Gemini API independent critique → Codex synthesis → Figma MCP → Figma`
+
+Gemini is a model service used by Codex. It is not a second Figma agent and it does not receive Figma MCP access.
+
+Do **not** use the Gemini CLI as the integration mechanism. The repository provides `tools/gemini_critic.py`, which calls the Gemini API directly over HTTPS.
+
+The local API key is read from:
+
+`.gemini/.env`
+
+or the process environment variable:
+
+`GEMINI_API_KEY`
+
+The `.gemini/` directory is ignored by Git and the key must never be committed.
+
 ## When to use
 
-Use Gemini when it is available locally through the `gemini` CLI and the task benefits from independent review, especially:
+Use Gemini when an independent review adds meaningful value, especially for:
 
 - UX audits
 - Information architecture reviews
@@ -28,24 +49,40 @@ Use Gemini when it is available locally through the `gemini` CLI and the task be
 - Competing design directions
 - Re-audits of an implementation
 - High-impact product decisions
+- Ambiguous or high-risk UX trade-offs
 
 Do not invoke Gemini for trivial edits where an independent critique adds no value.
+
+## Invocation
+
+From the repository root, Codex can invoke:
+
+`python3 tools/gemini_critic.py --prompt "<review brief>"`
+
+For visual critique, pass explicitly supplied local screenshots with repeated `--image` arguments:
+
+`python3 tools/gemini_critic.py --prompt "<review brief>" --image /path/to/screenshot.png`
+
+The script uses the Gemini Interactions API and defaults to the current Gemini Flash model configured in the script. `GEMINI_MODEL` can override the model without changing repository code.
+
+The script uses `store: false` for the critic request so the second-opinion workflow is stateless by default.
 
 ## Review protocol
 
 1. The primary agent inspects the authorised Figma context first.
 2. Prepare a concise, evidence-based review brief containing only the relevant design/context needed for critique.
-3. Ask Gemini to independently identify UX problems, missed opportunities, accessibility concerns, hierarchy issues, interaction risks, and business/funnel implications.
-4. Do not tell Gemini what conclusions the primary agent has already reached. Avoid leading the critique.
-5. Compare Gemini's findings with the primary analysis.
-6. Separate:
+3. If a screenshot is needed, obtain it only from the authorised Figma context and pass only that screenshot to Gemini.
+4. Ask Gemini to independently identify UX problems, missed opportunities, accessibility concerns, hierarchy issues, interaction risks, and business/funnel implications.
+5. Do not tell Gemini what conclusions the primary agent has already reached. Avoid leading the critique.
+6. Compare Gemini's findings with the primary analysis.
+7. Separate:
    - Agreement
    - New finding
    - Contradiction
    - Low-confidence opinion
-7. Resolve disagreements using requirements, evidence, user goals, design-system constraints, and business context.
-8. Do not blindly merge Gemini's suggestions into the final recommendation.
-9. The primary agent owns the final decision.
+8. Resolve disagreements using requirements, evidence, user goals, design-system constraints, and business context.
+9. Do not blindly merge Gemini's suggestions into the final recommendation.
+10. The primary Codex agent owns the final decision.
 
 ## Prompt contract
 
@@ -112,7 +149,7 @@ A Gemini invocation must not cause the primary agent to inspect or access Figma 
 
 ## Failure handling
 
-If the `gemini` command is unavailable, authentication is missing, or the invocation fails:
+If the Gemini API is unavailable, authentication is missing, or the invocation fails:
 
 - Continue with the primary agent's own analysis.
 - Do not block the user's task.
@@ -120,7 +157,7 @@ If the `gemini` command is unavailable, authentication is missing, or the invoca
 
 ## Implementation boundary
 
-Gemini should remain read-only in this workflow.
+Gemini remains read-only in this workflow.
 
 It must not:
 - Modify Figma
@@ -129,4 +166,6 @@ It must not:
 - Override approvals
 - Make access-control decisions
 
-The primary agent remains the orchestrator and final decision-maker.
+Only Codex, after applying `AGENTS.md`, may decide to modify Figma through the authorised Figma MCP connection.
+
+The primary Codex agent remains the orchestrator and final decision-maker.
