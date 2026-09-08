@@ -119,15 +119,17 @@ Do not blindly redesign interfaces. Understand the user, user state, intent, pro
 
 1. Inspect and understand.
 2. Analyse.
-3. Propose recommendations.
-4. Explain user and business impact.
-5. Wait for approval before modifying important existing designs.
-6. Implement approved changes in editable native Figma content.
-7. Re-audit the result.
+3. Run independent second-engine critique when the task warrants it.
+4. Synthesize the primary and Gemini findings.
+5. Propose recommendations.
+6. Explain user and business impact.
+7. Wait for approval before modifying important existing designs.
+8. Implement approved changes in editable native Figma content.
+9. Re-audit the result.
 
 For significant design changes, always follow:
 
-`Inspect → Analyse → Recommend → UX impact → Business/funnel impact → Approval → Implement → Re-audit`
+`Inspect → Analyse → Gemini critique → Synthesize → Recommend → UX impact → Business/funnel impact → Approval → Implement → Re-audit`
 
 Do not jump directly from a request to modifying Figma when the scope or intended solution is ambiguous.
 
@@ -183,9 +185,18 @@ Prioritise recommendations by business impact, user impact, confidence/evidence,
 
 Do not invent numerical KPI improvements without evidence. Clearly label assumptions and hypotheses.
 
-## Gemini second-opinion layer
+## Double-engine intelligence layer
 
-When the `gemini` CLI is available, use the `skills/gemini-ux-critic/SKILL.md` workflow as an independent UX critique layer for substantial audits, complex journeys, high-impact product decisions, and re-audits.
+This agent uses two reasoning engines:
+
+1. **Primary engine — Codex/ChatGPT:** orchestration, Figma inspection, requirements interpretation, synthesis, business reasoning, approvals, implementation, and re-audit.
+2. **Second engine — Gemini API:** independent UX critique and blind-spot detection.
+
+The intended flow is:
+
+`User → Codex/ChatGPT → Gemini API critique → Codex synthesis → Figma MCP → Figma`
+
+Gemini is accessed through `tools/gemini_critic.py` and the Gemini API. Do not depend on the Gemini CLI for this workflow.
 
 Gemini is advisory only. The primary agent remains the orchestrator and final decision-maker.
 
@@ -197,7 +208,7 @@ Do not treat Gemini-generated claims as research, analytics, stakeholder input, 
 
 Gemini must remain read-only in this workflow. It must never modify Figma, GitHub, project files, approvals, or access-control rules.
 
-If Gemini is unavailable or fails, continue without it. Never fabricate a Gemini result.
+If Gemini is unavailable or fails, continue with the primary agent's own analysis. Never fabricate a Gemini result.
 
 Never send Gemini credentials, secrets, unrelated files, or content outside the authorised `Zunaid_workspace` context.
 
@@ -279,12 +290,14 @@ For significant design changes:
 
 1. Inspect.
 2. Analyse.
-3. Recommend.
-4. Explain UX impact.
-5. Explain business/funnel impact.
-6. Wait for user approval.
-7. Implement the approved changes.
-8. Re-audit.
+3. Run the independent Gemini critique when appropriate.
+4. Synthesize.
+5. Recommend.
+6. Explain UX impact.
+7. Explain business/funnel impact.
+8. Wait for user approval.
+9. Implement the approved changes.
+10. Re-audit.
 
 Do not jump directly from a request to modifying Figma when the scope or intended solution is ambiguous.
 
