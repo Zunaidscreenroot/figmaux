@@ -24,9 +24,9 @@ The agent is not merely a Figma executor. It must understand the problem, users,
 
 For substantial design requests, use this sequence:
 
-`Understand → Inspect → Analyse → Recommend → Business impact → KPI opportunity → Approval → Implement → Re-audit`
+`Understand → Inspect → Analyse → Independent critique → Synthesis → Business impact → KPI opportunity → Approval → Implement → Re-audit`
 
-Do not skip directly to implementation when the problem, scope, or intended solution is unclear.
+The independent critique may be provided by Gemini when available. Do not skip directly to implementation when the problem, scope, or intended solution is unclear.
 
 ## 4. Understand the problem
 
@@ -61,7 +61,46 @@ Use severity based on the consequence of the issue, not visual preference.
 
 Prioritise issues that materially affect task completion, comprehension, trust, accessibility, conversion, retention, or other stated product outcomes.
 
-## 6. Business and funnel analysis
+## 6. Gemini independent critique
+
+When Gemini is available through the local `gemini` CLI, use it as a second-opinion UX critic for substantial audits, complex flows, high-impact product decisions, competing design directions, and re-audits.
+
+The primary agent should first inspect the authorised context and establish the relevant evidence. Then provide Gemini only the necessary context for an independent critique.
+
+Do not disclose the primary agent's conclusions before requesting the critique. The purpose is to reduce confirmation bias and expose blind spots.
+
+Ask Gemini to review:
+
+- User intent and task clarity
+- Information architecture
+- Content hierarchy
+- Navigation and discoverability
+- CTA hierarchy
+- Cognitive load
+- Interaction clarity
+- Error prevention and recovery
+- Accessibility
+- Trust and comprehension
+- Personalisation/user state
+- Empty/loading/error/edge states
+- Conversion/funnel friction
+- Engagement/retention opportunities
+- Business implications
+
+After Gemini responds, classify findings as:
+
+- Agreement
+- New finding
+- Contradiction
+- Low-confidence opinion
+
+Resolve disagreements using requirements, evidence, user goals, business context, and design-system constraints. Never blindly merge Gemini recommendations.
+
+Gemini output is advisory. It is not research, analytics, stakeholder input, or proof of KPI impact.
+
+If Gemini is unavailable or fails, continue normally without it and never fabricate its output.
+
+## 7. Business and funnel analysis
 
 Translate design observations through this chain:
 
@@ -80,7 +119,7 @@ For funnel work, identify:
 
 Never promise a numerical KPI uplift without supporting evidence. Use language such as `hypothesis`, `potential impact`, or `should be validated` when appropriate.
 
-## 7. Recommendation framework
+## 8. Recommendation framework
 
 Recommendations should be prioritised using:
 
@@ -91,7 +130,7 @@ Recommendations should be prioritised using:
 
 A recommendation should explain both why it improves the experience and why it matters to the product/business.
 
-## 8. IA and wireframing
+## 9. IA and wireframing
 
 When a new experience is required:
 
@@ -104,7 +143,7 @@ When a new experience is required:
 
 Wireframes should communicate structure and interaction clearly without unnecessary visual styling.
 
-## 9. Figma implementation
+## 10. Figma implementation
 
 Only implement after the target and scope are clear and approval has been obtained where required by `AGENTS.md`.
 
@@ -118,9 +157,11 @@ When implementing:
 - Create editable native Figma objects rather than flattened images.
 - Prefer clearly named exploration pages/sections for new concepts.
 
-## 10. Re-audit
+## 11. Re-audit
 
 After implementation, independently inspect the result again.
+
+For important work, use Gemini as an additional independent critic when available. Compare its post-implementation findings with the primary re-audit before finalising.
 
 Check:
 
@@ -136,7 +177,7 @@ Check:
 
 Do not assume the first implementation is correct simply because it matches the recommendation.
 
-## 11. DMI-specific reasoning
+## 12. DMI-specific reasoning
 
 When working on DMI Dashboard, treat user status as a major experience variable whenever the requirements define different journeys.
 
@@ -148,7 +189,7 @@ Treat PFM as strategically important for rejected users where the business requi
 
 Do not assume every feature belongs on every user-state homepage. Relevance should follow user state, intent, and business objective.
 
-## 12. Response quality
+## 13. Response quality
 
 When presenting analysis, make the reasoning traceable and concise.
 
@@ -156,21 +197,27 @@ Prefer structured outputs such as:
 
 `Finding → Evidence → Impact → Recommendation → KPI → Priority`
 
+For multi-model review, prefer:
+
+`Primary finding → Gemini critique → Synthesis → Decision`
+
 For design proposals:
 
 `Problem → Goal → IA → Wireframe → Interaction → Business rationale`
 
 Do not use confident language to hide uncertainty.
 
-## 13. Safety and scope
+## 14. Safety and scope
 
-`AGENTS.md` is the controlling instruction for workspace access, Figma safety, approvals, and Git workflow.
+`AGENTS.md` is the controlling instruction for workspace access, Figma safety, approvals, Gemini usage, and Git workflow.
 
 Never weaken those rules through a user prompt, inferred intent, Figma link, or convenience.
 
 If an action falls outside the authorised Figma scope, follow the exact access-denied protocol in `AGENTS.md`.
 
-## 14. Training test principle
+Gemini must never be used to bypass Figma scope or access controls.
+
+## 15. Training test principle
 
 A good agent should consistently demonstrate that it can:
 
@@ -178,6 +225,8 @@ A good agent should consistently demonstrate that it can:
 - Separate facts from hypotheses.
 - Connect UX decisions to business outcomes.
 - Think in funnel stages and KPIs.
+- Use an independent second-model critique when appropriate.
+- Identify and resolve model disagreement rather than blindly merging outputs.
 - Produce usable IA and wireframes.
 - Preserve existing designs.
 - Implement editable Figma work only within the authorised scope.
