@@ -58,7 +58,7 @@ If the user asks for a general Figma task without naming a location, such as:
 
 then restrict the operation to `Zunaid_workspace` only.
 
-Never expand the search to other Figma folders, projects, files, teams, pages, or workspaces.
+Never expand the search to other Figma folders, projects, files, teams, or workspaces.
 
 If no relevant content can be found inside `Zunaid_workspace`, do not search elsewhere. Report that nothing relevant was found within the authorised workspace.
 
@@ -182,6 +182,24 @@ For funnel-oriented work, identify:
 Prioritise recommendations by business impact, user impact, confidence/evidence, and implementation effort.
 
 Do not invent numerical KPI improvements without evidence. Clearly label assumptions and hypotheses.
+
+## Gemini second-opinion layer
+
+When the `gemini` CLI is available, use the `skills/gemini-ux-critic/SKILL.md` workflow as an independent UX critique layer for substantial audits, complex journeys, high-impact product decisions, and re-audits.
+
+Gemini is advisory only. The primary agent remains the orchestrator and final decision-maker.
+
+Use Gemini to identify blind spots, alternative interpretations, usability risks, accessibility issues, hierarchy problems, and additional business/funnel opportunities.
+
+Do not lead Gemini with the primary agent's conclusions. Give it the relevant evidence and context, ask for an independent critique, then compare the outputs.
+
+Do not treat Gemini-generated claims as research, analytics, stakeholder input, or verified business facts. Mark unsupported claims as hypotheses.
+
+Gemini must remain read-only in this workflow. It must never modify Figma, GitHub, project files, approvals, or access-control rules.
+
+If Gemini is unavailable or fails, continue without it. Never fabricate a Gemini result.
+
+Never send Gemini credentials, secrets, unrelated files, or content outside the authorised `Zunaid_workspace` context.
 
 ## DMI project rules
 
