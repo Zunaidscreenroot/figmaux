@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gemini Visual Reviewer</title>
+  <meta name="description" content="Independent Gemini visual review for product and UX screenshots." />
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f7fb;background:#0b0d11;color-scheme:dark}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 80% 0%,#1c2440 0,#0b0d11 42%);}
+    .shell{max-width:1180px;margin:0 auto;padding:44px 24px 64px}.top{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:32px}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8fa4ff;font-weight:700}.title{font-size:42px;line-height:1.05;margin:8px 0 10px;letter-spacing:-.04em}.sub{color:#9ca6b8;max-width:700px;line-height:1.55;margin:0}.badge{border:1px solid #29334d;background:#111725;padding:9px 12px;border-radius:999px;color:#b7c4ff;font-size:12px;white-space:nowrap}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.panel{background:rgba(17,21,30,.86);border:1px solid #252c39;border-radius:20px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}label{display:block;font-size:13px;font-weight:700;color:#dce2ee;margin:0 0 8px}.drop{border:1px dashed #3a4558;border-radius:16px;min-height:360px;display:grid;place-items:center;overflow:hidden;background:#0c1017;position:relative}.drop.drag{border-color:#8fa4ff;background:#11172a}.drop input{display:none}.drop-inner{text-align:center;padding:30px;color:#8e98aa}.drop-inner strong{display:block;color:#e9edf5;font-size:16px;margin-bottom:7px}.preview{max-width:100%;max-height:560px;display:none;object-fit:contain}.field{margin-top:18px}.textarea{width:100%;min-height:155px;resize:vertical;background:#0d1118;color:#e8edf6;border:1px solid #2b3444;border-radius:12px;padding:13px;font:inherit;line-height:1.5;outline:none}.textarea:focus{border-color:#7186e8}.select{width:100%;background:#0d1118;color:#e8edf6;border:1px solid #2b3444;border-radius:12px;padding:12px;font:inherit}
+    .actions{display:flex;gap:10px;margin-top:18px}.button{border:0;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer}.primary{background:#7f95ff;color:#08101f}.secondary{background:#1a202b;color:#dce3ef;border:1px solid #2b3444}.button:disabled{opacity:.45;cursor:not-allowed}.status{margin-top:12px;color:#8e98aa;font-size:13px;min-height:20px}.result{min-height:610px;white-space:pre-wrap;color:#dfe5ef;line-height:1.65;font-size:14px}.result.empty{display:grid;place-items:center;color:#687386;text-align:center}.meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.chip{font-size:11px;border:1px solid #2b3444;background:#101620;border-radius:999px;padding:6px 9px;color:#9eabc0}.hint{font-size:12px;color:#69758a;line-height:1.5;margin-top:10px}.footer{margin-top:22px;color:#626d80;font-size:12px}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    @media(max-width:850px){.grid{grid-template-columns:1fr}.title{font-size:34px}.top{flex-direction:column}.badge{align-self:flex-start}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <div><div class="eyebrow">Screenroot · AI design intelligence</div><h1 class="title">Gemini Visual Reviewer</h1><p class="sub">Upload a UI screenshot or pass a Figma screenshot URL to get an independent, evidence-based visual UX critique. Gemini is read-only: it reviews the design and never edits Figma.</p></div>
+      <div class="badge">Gemini 3.8 Flash · Vision</div>
+    </header>
+    <section class="grid">
+      <div class="panel">
+        <label>Screenshot</label>
+        <div class="drop" id="drop"><input id="file" type="file" accept="image/png,image/jpeg,image/webp"/><img id="preview" class="preview" alt="Screenshot preview"/><div class="drop-inner" id="dropText"><strong>Drop a screenshot here</strong><span>or click to choose a PNG, JPG or WebP</span></div></div>
+        <div class="field"><label for="url">Or Figma screenshot URL</label><input id="url" class="textarea" style="min-height:0" placeholder="https://www.figma.com/api/mcp/asset/..." /></div>
+        <div class="field"><label for="context">Review context</label><textarea id="context" class="textarea" placeholder="Example: NTB DMI Dashboard. Products are primary; PFM secondary; Credit Score and Bills are supporting. Reduce clutter and improve conversion."></textarea></div>
+        <div class="field"><label for="focus">Review focus</label><select id="focus" class="select"><option value="full">Full visual UX review</option><option value="hierarchy">Hierarchy & information architecture</option><option value="mobile">Mobile usability & thumb reach</option><option value="conversion">Funnel & conversion opportunities</option><option value="visual">High-fidelity visual quality</option></select></div>
+        <div class="actions"><button class="button primary" id="review" disabled>Review with Gemini</button><button class="button secondary" id="clear">Clear</button></div>
+        <div class="status" id="status"></div>
+        <div class="hint">For ChatGPT automation, use <span class="code">/api/review?image_url=...</span>. The endpoint only accepts Figma-hosted screenshot URLs.</div>
+      </div>
+      <div class="panel"><div class="meta"><span class="chip">Independent critic</span><span class="chip">Visual + UX</span><span class="chip">Business-aware</span><span class="chip">Read-only</span></div><div class="result empty" id="result">Gemini's review will appear here.<br/>It will prioritize concrete issues, impact, and actionable fixes.</div></div>
+    </section>
+    <div class="footer">The Gemini API key is server-side only and is never exposed to the browser.</div>
+  </main>
+<script>
+const $=id=>document.getElementById(id);let selectedFile=null;
+const sync=()=>{$('review').disabled=!(selectedFile||$('url').value.trim())};
+$('drop').onclick=()=>{if(!selectedFile)$('file').click()};
+$('file').onchange=e=>{selectedFile=e.target.files[0]||null;if(selectedFile){$('url').value='';const r=new FileReader();r.onload=()=>{$('preview').src=r.result;$('preview').style.display='block';$('dropText').style.display='none'};r.readAsDataURL(selectedFile)}sync()};
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=>$('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');$('file').files=e.dataTransfer.files;$('file').dispatchEvent(new Event('change'))};$('url').oninput=()=>{if($('url').value.trim()){selectedFile=null;$('preview').style.display='none';$('dropText').style.display='block'}sync()};
+$('clear').onclick=()=>{selectedFile=null;$('file').value='';$('url').value='';$('context').value='';$('preview').style.display='none';$('dropText').style.display='block';$('result').className='result empty';$('result').innerHTML="Gemini's review will appear here.<br/>It will prioritize concrete issues, impact, and actionable fixes.";$('status').textContent='';sync()};
+$('review').onclick=async()=>{const btn=$('review');btn.disabled=true;$('status').textContent='Sending screenshot to Gemini…';$('result').className='result';$('result').textContent='Analyzing visual hierarchy, usability, interaction patterns and conversion opportunities…';try{let data;if(selectedFile){if(selectedFile.size>15*1024*1024)throw new Error('Screenshot is larger than 15 MB. Please use a smaller export.');const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(selectedFile)});data={image_data:b64,mime_type:selectedFile.type,context:$('context').value,focus:$('focus').value}}else{data={image_url:$('url').value.trim(),context:$('context').value,focus:$('focus').value}}const res=await fetch('/api/review',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});const json=await res.json();if(!res.ok)throw new Error(json.error||'Review failed');$('result').textContent=json.analysis||'No analysis returned.';$('status').textContent=`Reviewed with ${json.model||'Gemini'}`;}catch(e){$('result').textContent=e.message;$('status').textContent='Review failed.'}finally{sync()}};
+</script>
+</body></html>
