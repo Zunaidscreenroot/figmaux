@@ -1,11 +1,6 @@
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_INLINE_BASE64_CHARS = 5_500_000;
-const ALLOWED_FIGMA_HOSTS = [
-  "figma.com",
-  "www.figma.com",
-  "figmausercontent.com",
-  "www.figmausercontent.com",
-];
+const ALLOWED_FIGMA_HOSTS = ["figma.com", "www.figma.com", "figmausercontent.com", "www.figmausercontent.com"];
 
 const ISSUE_SCHEMA = {
   type: "object",
@@ -45,37 +40,18 @@ const REVIEW_SCHEMA = {
     do_not_change: { type: "array", items: { type: "string" } },
     assumptions: { type: "array", items: { type: "string" } },
   },
-  required: [
-    "score",
-    "verdict",
-    "critical_issues",
-    "ux_issues",
-    "visual_issues",
-    "business_opportunities",
-    "recommended_fixes",
-    "high_fidelity_polish",
-    "do_not_change",
-    "assumptions",
-  ],
+  required: ["score", "verdict", "critical_issues", "ux_issues", "visual_issues", "business_opportunities", "recommended_fixes", "high_fidelity_polish", "do_not_change", "assumptions"],
   additionalProperties: false,
 };
 
 function json(data: unknown, status = 200) {
-  return Response.json(data, {
-    status,
-    headers: { "cache-control": "no-store" },
-  });
+  return Response.json(data, { status, headers: { "cache-control": "no-store" } });
 }
 
 function isAllowedImageUrl(value: string) {
   try {
     const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      ALLOWED_FIGMA_HOSTS.some(
-        (host) => url.hostname === host || url.hostname.endsWith(`.${host}`),
-      )
-    );
+    return url.protocol === "https:" && ALLOWED_FIGMA_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
   } catch {
     return false;
   }
@@ -122,48 +98,28 @@ Return JSON matching the supplied response schema exactly. Keep arrays concise a
 }
 
 async function imageFromUrl(url: string) {
-  if (!isAllowedImageUrl(url)) {
-    throw new Error("Only HTTPS Figma screenshot URLs are accepted.");
-  }
-
+  if (!isAllowedImageUrl(url)) throw new Error("Only HTTPS Figma screenshot URLs are accepted.");
   const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok) {
-    throw new Error(`Could not fetch the Figma screenshot (${response.status}).`);
-  }
-
+  if (!response.ok) throw new Error(`Could not fetch the Figma screenshot (${response.status}).`);
   const contentLength = Number(response.headers.get("content-length") || 0);
   if (contentLength > MAX_IMAGE_BYTES) throw new Error("Screenshot is larger than 15 MB.");
-
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error("Screenshot is larger than 15 MB.");
-
   const mime = (response.headers.get("content-type") || "image/png").split(";")[0];
   if (!mime.startsWith("image/")) throw new Error("The supplied Figma URL did not return an image.");
 
   let binary = "";
   const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-
-  return { data: Buffer.from(binary, "binary").toString("base64"), mime_type: mime };
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return { data: btoa(binary), mime_type: mime };
 }
 
 function extractOutput(body: any) {
   if (typeof body?.output_text === "string") return body.output_text.trim();
-
   const steps = Array.isArray(body?.steps) ? body.steps : [];
   const modelStep = [...steps].reverse().find((step: any) => step?.type === "model_output");
   const content = modelStep?.content;
-
-  if (Array.isArray(content)) {
-    return content
-      .filter((item: any) => item?.type === "text")
-      .map((item: any) => item.text)
-      .join("\n")
-      .trim();
-  }
-
+  if (Array.isArray(content)) return content.filter((item: any) => item?.type === "text").map((item: any) => item.text).join("\n").trim();
   return "";
 }
 
@@ -177,41 +133,33 @@ function parseJsonOutput(text: string) {
   }
 }
 
+function getEnv(name: string) {
+  return ((globalThis as any).process?.env?.[name] as string | undefined) || undefined;
+}
+
 async function callGemini(image: { data: string; mime_type: string }, prompt: string) {
-  const key = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const key = getEnv("GEMINI_API_KEY");
+  const model = getEnv("GEMINI_MODEL") || "gemini-3.8-flash";
   if (!key) throw new Error("GEMINI_API_KEY is not configured on Vercel.");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 55_000);
-
   try {
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": key,
-      },
+      headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         model,
         input: [
           { type: "image", data: image.data, mime_type: image.mime_type, resolution: "high" },
           { type: "text", text: prompt },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: { name: "ux_visual_review", schema: REVIEW_SCHEMA },
-        },
+        response_format: { type: "json_schema", json_schema: { name: "ux_visual_review", schema: REVIEW_SCHEMA } },
       }),
       signal: controller.signal,
     });
-
     const body = await response.json();
-    if (!response.ok) {
-      const message = body?.error?.message || `Gemini request failed (${response.status}).`;
-      throw new Error(message);
-    }
-
+    if (!response.ok) throw new Error(body?.error?.message || `Gemini request failed (${response.status}).`);
     const output = extractOutput(body);
     if (!output) throw new Error("Gemini returned no review.");
     return { review: parseJsonOutput(output), model };
@@ -221,22 +169,14 @@ async function callGemini(image: { data: string; mime_type: string }, prompt: st
 }
 
 function getReviewInputs(params: URLSearchParams) {
-  return {
-    context: params.get("context") || "",
-    task: params.get("task") || "",
-    screen: params.get("screen") || "",
-    focus: params.get("focus") || "full",
-    mode: params.get("mode") || "post_change",
-  };
+  return { context: params.get("context") || "", task: params.get("task") || "", screen: params.get("screen") || "", focus: params.get("focus") || "full", mode: params.get("mode") || "post_change" };
 }
 
 async function handle(request: Request) {
   const url = new URL(request.url);
-
   if (request.method === "GET") {
     const imageUrl = url.searchParams.get("image_url");
     if (!imageUrl) return json({ ok: false, error: "Missing image_url. Pass a Figma screenshot URL." }, 400);
-
     try {
       const image = await imageFromUrl(imageUrl);
       const inputs = getReviewInputs(url.searchParams);
@@ -247,33 +187,19 @@ async function handle(request: Request) {
     }
   }
 
-  if (request.method !== "POST") {
-    return json({ ok: false, error: "Use GET with image_url or POST with JSON." }, 405);
-  }
-
+  if (request.method !== "POST") return json({ ok: false, error: "Use GET with image_url or POST with JSON." }, 405);
   try {
     const body = await request.json();
     let image: { data: string; mime_type: string };
-
     if (typeof body.image_data === "string" && body.image_data.length) {
-      if (body.image_data.length > MAX_INLINE_BASE64_CHARS) {
-        throw new Error("Screenshot is too large for an inline request. Use a Figma screenshot URL instead.");
-      }
+      if (body.image_data.length > MAX_INLINE_BASE64_CHARS) throw new Error("Screenshot is too large for an inline request. Use a Figma screenshot URL instead.");
       image = { data: body.image_data, mime_type: body.mime_type || "image/png" };
     } else if (typeof body.image_url === "string") {
       image = await imageFromUrl(body.image_url);
     } else {
       return json({ ok: false, error: "Provide image_data or image_url." }, 400);
     }
-
-    const inputs = {
-      context: body.context || "",
-      task: body.task || "",
-      screen: body.screen || "",
-      focus: body.focus || "full",
-      mode: body.mode || "post_change",
-    };
-
+    const inputs = { context: body.context || "", task: body.task || "", screen: body.screen || "", focus: body.focus || "full", mode: body.mode || "post_change" };
     const result = await callGemini(image, buildPrompt(inputs));
     return json({ ok: true, ...inputs, ...result });
   } catch (error) {
@@ -281,6 +207,4 @@ async function handle(request: Request) {
   }
 }
 
-export default {
-  fetch: handle,
-};
+export default { fetch: handle };
