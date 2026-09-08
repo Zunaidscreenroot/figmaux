@@ -1,6 +1,6 @@
 # Gemini Visual Reviewer
 
-This repository is the source for a Netlify-hosted, Gemini-powered visual UX reviewer used from ChatGPT.
+This repository is the source for a Vercel-hosted, Gemini-powered visual UX reviewer used from ChatGPT.
 
 ## Purpose
 
@@ -8,7 +8,7 @@ The application receives UI screenshots and returns an independent visual/UX cri
 
 ## Architecture
 
-`ChatGPT → Figma MCP screenshot → Netlify /api/review → Gemini Vision → JSON analysis → ChatGPT`
+`ChatGPT → Figma MCP screenshot → Vercel /api/review → Gemini Vision → JSON analysis → ChatGPT`
 
 Gemini is read-only. It must never modify Figma, GitHub, project files, approvals, or access-control rules.
 
@@ -47,7 +47,7 @@ For DMI:
 
 The endpoint also accepts POST JSON with `image_url` or `image_data`.
 
-Only HTTPS Figma-hosted screenshot URLs are accepted for URL-based reviews. Gemini credentials stay server-side in Netlify environment variables.
+Only HTTPS Figma-hosted screenshot URLs are accepted for URL-based reviews. Gemini credentials stay server-side in Vercel environment variables.
 
 ## Git workflow
 
