@@ -4,9 +4,38 @@ Backend-only visual UX review service for the Screenroot design workflow, deploy
 
 ## Purpose
 
-This service is an independent visual-review layer. It receives a Figma screenshot plus product/task context, sends the image to Gemini 3.8 Flash, and returns structured UX, visual and business/funnel findings.
+This service is an independent visual-review layer. It receives a Figma screenshot plus product/task context, sends the image to Gemini Flash, and returns structured UX, visual and business/funnel findings.
 
 It has **no browser reviewer UI and no Figma write access**.
+
+## Canonical ChatGPT workflow
+
+The reviewer is one stage in a controlled ChatGPT + Figma workflow:
+
+`User prompt → permission gate → Figma inspect → screenshot → ChatGPT review → Gemini review → ChatGPT reconciliation → combined medium/high-priority changes → approved Figma edit → re-screenshot → re-audit`
+
+### Scope gate
+
+Every Figma operation must explicitly display:
+
+**Working scope: only `Zunaid_workspace → Homepage`**
+
+ChatGPT must ask for the appropriate permission before Figma access and must distinguish read/inspect, screenshot/review, and write/edit permission. No write operation happens without explicit approval.
+
+### Visible execution stages
+
+ChatGPT reports these stages in the conversation while working:
+
+1. Permission & scope
+2. Inspecting Figma
+3. Taking screenshot
+4. ChatGPT review
+5. Gemini review
+6. Reconciling insights
+7. Implementing approved changes
+8. Re-audit
+
+Internal reasoning is not exposed; only concise progress and conclusions are shown.
 
 ## Architecture
 
@@ -56,18 +85,32 @@ The structured review contains:
 
 Issues include severity, visible evidence and impact. Recommended fixes include priority, before/after direction and rationale.
 
-## Intended ChatGPT loop
+## Insight reconciliation rules
 
-1. Inspect the allowed Figma screen.
-2. Form the UX/product hypothesis.
-3. Make the requested Figma change.
-4. Take a fresh Figma screenshot.
-5. Call `/api/review` with screenshot + task/context.
-6. Compare Gemini's independent findings with the designer analysis.
-7. Fix missed high-impact issues in Figma when appropriate.
-8. Re-screenshot and optionally re-review.
+ChatGPT owns the final decision. Gemini is an independent critic, not the source of truth.
 
-Gemini is a critic, not the source of truth: product requirements and the approved design intent remain authoritative.
+After both reviews, ChatGPT should explicitly reconcile:
+- shared findings
+- conflicting findings
+- Gemini-only findings worth accepting
+- ChatGPT-only findings worth accepting
+- unsupported/redundant/low-impact findings to reject
+
+The implementation list should prioritize **critical, high and medium** actionable findings. Low-priority polish is deferred unless needed to resolve a higher-priority issue. Approved product requirements and design intent override generic recommendations.
+
+## Figma implementation rules
+
+- Stay strictly within `Zunaid_workspace → Homepage`.
+- Never inspect or edit other Figma files, pages, folders, projects, teams or workspaces.
+- Existing designs are protected unless the user explicitly approves the edit.
+- Prefer a new exploration/iteration frame when appropriate.
+- After changes, always take a fresh screenshot and re-audit before declaring the iteration complete.
+
+## DMI context
+
+- NTB: Personal Loan, Business Loan, DMIcash, Insurance and Wealth Pro are primary; PFM is secondary; Credit Score and Bills & Payments are supporting tools.
+- Rejected: PFM is primary and should communicate building healthier credit habits/profile; Credit Score and Bills & Payments are secondary; no loan offering.
+- Reduce clutter and unnecessary vertical space. Use compact patterns such as carousels when they preserve discoverability and hierarchy.
 
 ## Security / limits
 
@@ -81,3 +124,14 @@ Gemini is a critic, not the source of truth: product requirements and the approv
 
 - `GEMINI_API_KEY` — required secret in Vercel.
 - `GEMINI_MODEL` — optional; defaults to `gemini-3.8-flash`.
+- `GEMINI_FALLBACK_MODEL` — optional; defaults to `gemini-3.7-flash`.
+
+## Git workflow
+
+GitHub repository: `Zunaidscreenroot/figmaux`.
+
+The user will pull changes locally with:
+
+`git pull origin main`
+
+Do not require Codex for the deployed reviewer workflow.
