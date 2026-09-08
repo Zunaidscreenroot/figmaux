@@ -1,12 +1,18 @@
 # Gemini Visual Reviewer
 
-Backend-only visual UX review service for the Screenroot design workflow.
+Backend-only visual UX review service for the Screenroot design workflow, deployed on Vercel.
 
 ## Purpose
 
 This service is an independent visual-review layer. It receives a Figma screenshot plus product/task context, sends the image to Gemini 3.8 Flash, and returns structured UX, visual and business/funnel findings.
 
 It has **no browser reviewer UI and no Figma write access**.
+
+## Architecture
+
+`ChatGPT → Figma MCP screenshot → Vercel /api/review → Gemini Vision → JSON analysis → ChatGPT`
+
+Gemini is read-only. It must never modify Figma, GitHub, project files, approvals, or access-control rules.
 
 ## API
 
@@ -65,14 +71,13 @@ Gemini is a critic, not the source of truth: product requirements and the approv
 
 ## Security / limits
 
-- `GEMINI_API_KEY` stays server-side in Netlify environment variables.
+- `GEMINI_API_KEY` stays server-side in Vercel environment variables.
 - URL-based images are restricted to HTTPS Figma hosts.
 - Remote screenshots are limited to 15 MB.
-- Inline base64 images are limited to keep requests within Netlify's function payload constraints.
-- Netlify rate limiting is configured at 10 requests per IP per 60 seconds.
+- Inline base64 images are limited to keep requests within serverless request limits; Figma URLs are preferred.
 - The endpoint does not expose or accept Figma write operations.
 
 ## Environment variables
 
-- `GEMINI_API_KEY` — required secret.
+- `GEMINI_API_KEY` — required secret in Vercel.
 - `GEMINI_MODEL` — optional; defaults to `gemini-3.8-flash`.
