@@ -137,10 +137,28 @@ function getEnv(name: string) {
   return ((globalThis as any).process?.env?.[name] as string | undefined) || undefined;
 }
 
+function getGeminiModels() {
+  const primary = getEnv("GEMINI_MODEL") || "gemini-3.8-flash";
+  const configuredFallbacks = (getEnv("GEMINI_FALLBACK_MODELS") || "")
+    .split(",")
+    .map((model) => model.trim())
+    .filter(Boolean);
+
+  const defaultFallbacks = [
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+  ];
+
+  return [...new Set([primary, ...configuredFallbacks, ...defaultFallbacks])];
+}
+
 function isTransientGeminiFailure(status: number, message: string) {
   if ([408, 429, 500, 502, 503, 504].includes(status)) return true;
   const normalized = message.toLowerCase();
-  return normalized.includes("high demand") || normalized.includes("temporarily unavailable") || normalized.includes("overloaded") || normalized.includes("rate limit");
+  return normalized.includes("high demand") || normalized.includes("temporarily unavailable") || normalized.includes("overloaded") || normalized.includes("rate limit") || normalized.includes("resource exhausted") || normalized.includes("quota");
 }
 
 async function requestGeminiModel(image: { data: string; mime_type: string }, prompt: string, model: string, key: string, signal: AbortSignal) {
@@ -175,22 +193,29 @@ async function requestGeminiModel(image: { data: string; mime_type: string }, pr
 
 async function callGemini(image: { data: string; mime_type: string }, prompt: string) {
   const key = getEnv("GEMINI_API_KEY");
-  const primaryModel = getEnv("GEMINI_MODEL") || "gemini-3.8-flash";
-  const fallbackModel = getEnv("GEMINI_FALLBACK_MODEL") || "gemini-3.7-flash";
+  const models = getGeminiModels();
   if (!key) throw new Error("GEMINI_API_KEY is not configured on Vercel.");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 55_000);
-  try {
-    try {
-      return await requestGeminiModel(image, prompt, primaryModel, key, controller.signal);
-    } catch (error) {
-      const status = typeof (error as any)?.status === "number" ? (error as any).status : 0;
-      const message = error instanceof Error ? error.message : "Unknown Gemini error.";
-      if (fallbackModel === primaryModel || !isTransientGeminiFailure(status, message)) throw error;
+  const failures: Array<{ model: string; message: string }> = [];
 
-      return await requestGeminiModel(image, prompt, fallbackModel, key, controller.signal);
+  try {
+    for (const model of models) {
+      try {
+        return await requestGeminiModel(image, prompt, model, key, controller.signal);
+      } catch (error) {
+        const status = typeof (error as any)?.status === "number" ? (error as any).status : 0;
+        const message = error instanceof Error ? error.message : "Unknown Gemini error.";
+        failures.push({ model, message });
+
+        if (!isTransientGeminiFailure(status, message)) throw error;
+        if (controller.signal.aborted) throw error;
+      }
     }
+
+    const attempted = failures.map((failure) => `${failure.model}: ${failure.message}`).join(" | ");
+    throw new Error(`All Gemini review models were temporarily unavailable. Attempted: ${attempted}`);
   } finally {
     clearTimeout(timeout);
   }
