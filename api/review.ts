@@ -137,36 +137,60 @@ function getEnv(name: string) {
   return ((globalThis as any).process?.env?.[name] as string | undefined) || undefined;
 }
 
+function isTransientGeminiFailure(status: number, message: string) {
+  if ([408, 429, 500, 502, 503, 504].includes(status)) return true;
+  const normalized = message.toLowerCase();
+  return normalized.includes("high demand") || normalized.includes("temporarily unavailable") || normalized.includes("overloaded") || normalized.includes("rate limit");
+}
+
+async function requestGeminiModel(image: { data: string; mime_type: string }, prompt: string, model: string, key: string, signal: AbortSignal) {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify({
+      model,
+      input: [
+        { type: "image", data: image.data, mime_type: image.mime_type, resolution: "high" },
+        { type: "text", text: prompt },
+      ],
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema: REVIEW_SCHEMA,
+      },
+    }),
+    signal,
+  });
+  const body = await response.json();
+  const message = body?.error?.message || `Gemini request failed (${response.status}).`;
+  if (!response.ok) {
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  const output = extractOutput(body);
+  if (!output) throw new Error("Gemini returned no review.");
+  return { review: parseJsonOutput(output), model };
+}
+
 async function callGemini(image: { data: string; mime_type: string }, prompt: string) {
   const key = getEnv("GEMINI_API_KEY");
-  const model = getEnv("GEMINI_MODEL") || "gemini-3.8-flash";
+  const primaryModel = getEnv("GEMINI_MODEL") || "gemini-3.8-flash";
+  const fallbackModel = getEnv("GEMINI_FALLBACK_MODEL") || "gemini-3.7-flash";
   if (!key) throw new Error("GEMINI_API_KEY is not configured on Vercel.");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 55_000);
   try {
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        model,
-        input: [
-          { type: "image", data: image.data, mime_type: image.mime_type, resolution: "high" },
-          { type: "text", text: prompt },
-        ],
-        response_format: {
-          type: "text",
-          mime_type: "application/json",
-          schema: REVIEW_SCHEMA,
-        },
-      }),
-      signal: controller.signal,
-    });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body?.error?.message || `Gemini request failed (${response.status}).`);
-    const output = extractOutput(body);
-    if (!output) throw new Error("Gemini returned no review.");
-    return { review: parseJsonOutput(output), model };
+    try {
+      return await requestGeminiModel(image, prompt, primaryModel, key, controller.signal);
+    } catch (error) {
+      const status = typeof (error as any)?.status === "number" ? (error as any).status : 0;
+      const message = error instanceof Error ? error.message : "Unknown Gemini error.";
+      if (fallbackModel === primaryModel || !isTransientGeminiFailure(status, message)) throw error;
+
+      return await requestGeminiModel(image, prompt, fallbackModel, key, controller.signal);
+    }
   } finally {
     clearTimeout(timeout);
   }
