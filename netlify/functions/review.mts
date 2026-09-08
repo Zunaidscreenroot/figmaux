@@ -2,6 +2,7 @@ import type { Config, Context } from "@netlify/functions";
 
 const MODEL = Netlify.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_INLINE_BASE64_CHARS = 5_500_000;
 const ALLOWED_FIGMA_HOSTS = ["figma.com", "www.figma.com", "figmausercontent.com", "www.figmausercontent.com"];
 
 function json(data: unknown, status = 200) {
@@ -152,7 +153,7 @@ export default async (req: Request, _context: Context) => {
     const body = await req.json();
     let image: { data: string; mime_type: string };
     if (typeof body.image_data === "string" && body.image_data.length) {
-      if (body.image_data.length > 21_000_000) throw new Error("Screenshot is larger than 15 MB.");
+      if (body.image_data.length > MAX_INLINE_BASE64_CHARS) throw new Error("Screenshot is too large for a browser upload. Use the Figma screenshot URL field instead.");
       image = { data: body.image_data, mime_type: body.mime_type || "image/png" };
     } else if (typeof body.image_url === "string") {
       image = await imageFromUrl(body.image_url);
@@ -166,4 +167,8 @@ export default async (req: Request, _context: Context) => {
   }
 };
 
-export const config: Config = { path: "/api/review" };
+export const config: Config = {
+  path: "/api/review",
+  method: ["GET", "POST"],
+  rateLimit: { action: "rate_limit", aggregateBy: ["ip"], windowSize: 60, windowLimit: 10 },
+};
