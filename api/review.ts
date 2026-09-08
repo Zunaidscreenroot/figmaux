@@ -154,7 +154,11 @@ async function callGemini(image: { data: string; mime_type: string }, prompt: st
           { type: "image", data: image.data, mime_type: image.mime_type, resolution: "high" },
           { type: "text", text: prompt },
         ],
-        response_format: { type: "json_schema", json_schema: { name: "ux_visual_review", schema: REVIEW_SCHEMA } },
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema: REVIEW_SCHEMA,
+        },
       }),
       signal: controller.signal,
     });
